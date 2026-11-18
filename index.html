@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>粒子圣诞树</title>
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 40%, #4a1d63 0%, #2c0f45 45%, #180826 80%, #0d0417 100%);
+  }
+  canvas { display: block; position: relative; z-index: 2; }
+  .bokeh {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden;
+  }
+  .bokeh span {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(230,180,255,0.35), rgba(230,180,255,0) 70%);
+    animation: drift linear infinite;
+  }
+  @keyframes drift {
+    from { transform: translateY(0) translateX(0); }
+    to   { transform: translateY(-40px) translateX(20px); }
+  }
+  .stars {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  }
+  .stars span {
+    position: absolute;
+    width: 2px; height: 2px;
+    background: #fff;
+    border-radius: 50%;
+    animation: twinkleStar ease-in-out infinite;
+  }
+  @keyframes twinkleStar {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.9; }
+  }
+  .fireworks { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+  .fw {
+    position: absolute;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    box-shadow: 0 0 12px 4px currentColor;
+    animation: fwburst ease-out forwards;
+  }
+  @keyframes fwburst {
+    0%   { transform: translate(0,0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+  }
+  .snowflake-deco {
+    position: fixed;
+    color: rgba(235,210,255,0.7);
+    text-shadow: 0 0 8px rgba(220,180,255,0.8);
+    animation: flakeDrift linear infinite, flakeSpin linear infinite;
+    pointer-events: none;
+    z-index: 4;
+  }
+  @keyframes flakeDrift {
+    from { transform: translateY(-5vh); }
+    to   { transform: translateY(105vh); }
+  }
+  @keyframes flakeSpin {
+    from { filter: brightness(1); }
+    50%  { filter: brightness(1.6); }
+    to   { filter: brightness(1); }
+  }
+  .caption {
+    position: fixed;
+    bottom: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #faf0ff;
+    font-family: "Brush Script MT", "STKaiti", "Segoe Script", cursive, serif;
+    font-size: 68px;
+    letter-spacing: 1px;
+    text-align: center;
+    text-shadow: 0 0 10px rgba(255,255,255,0.9), 0 0 25px rgba(230,150,255,0.95), 0 0 55px rgba(190,100,255,0.7), 0 0 90px rgba(150,70,220,0.4);
+    opacity: 0;
+    animation: fadein 2.5s ease forwards 0.6s;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .caption small {
+    display: block;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 14px;
+    letter-spacing: 4px;
+    color: rgba(230,200,255,0.5);
+    margin-top: 6px;
+  }
+  @keyframes fadein { to { opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="stars" id="stars"></div>
+<div class="fireworks" id="fireworks"></div>
+<div id="flakes"></div>
+<div class="bokeh" id="bokeh"></div>
+<div class="caption">Merry Christmas<small>WISHING YOU JOY THIS SEASON</small></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script>
+const bokeh = document.getElementById('bokeh');
+for (let i = 0; i < 18; i++) {
+  const s = document.createElement('span');
+  const size = 30 + Math.random() * 90;
+  s.style.width = s.style.height = size + 'px';
+  s.style.left = Math.random() * 100 + '%';
+  s.style.top = Math.random() * 100 + '%';
+  s.style.animationDuration = (8 + Math.random() * 10) + 's';
+  s.style.animationDelay = (Math.random() * 6) + 's';
+  s.style.opacity = 0.3 + Math.random() * 0.4;
+  bokeh.appendChild(s);
+}
+
+// 背景星空
+const starsLayer = document.getElementById('stars');
+for (let i = 0; i < 120; i++) {
+  const s = document.createElement('span');
+  s.style.left = Math.random() * 100 + '%';
+  s.style.top = Math.random() * 70 + '%';
+  const sz = 1 + Math.random() * 2;
+  s.style.width = s.style.height = sz + 'px';
+  s.style.animationDuration = (2 + Math.random() * 3) + 's';
+  s.style.animationDelay = (Math.random() * 4) + 's';
+  starsLayer.appendChild(s);
+}
+
+// 装饰雪花飘落
+const flakesLayer = document.createElement('div');
+document.body.appendChild(flakesLayer);
+for (let i = 0; i < 24; i++) {
+  const f = document.createElement('div');
+  f.className = 'snowflake-deco';
+  f.textContent = '❄';
+  f.style.left = Math.random() * 100 + '%';
+  f.style.fontSize = (10 + Math.random() * 16) + 'px';
+  f.style.animationDuration = (10 + Math.random() * 14) + 's, ' + (2 + Math.random()*2) + 's';
+  f.style.animationDelay = (Math.random() * 12) + 's, 0s';
+  f.style.opacity = 0.4 + Math.random() * 0.5;
+  flakesLayer.appendChild(f);
+}
+
+// 烟花爆闪
+const fwLayer = document.getElementById('fireworks');
+const FW_COLORS = ['#e6b4ff', '#ffd1e8', '#bfe8ff', '#ffe9c2', '#c9b6ff'];
+function burstFirework() {
+  const cx = 4 + Math.random() * 60;
+  const cy = 4 + Math.random() * 42;
+  const n = 26;
+  const color = FW_COLORS[Math.floor(Math.random() * FW_COLORS.length)];
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('div');
+    p.className = 'fw';
+    p.style.color = color;
+    p.style.background = color;
+    const angle = (i / n) * Math.PI * 2;
+    const dist = 50 + Math.random() * 70;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+    p.style.left = cx + '%';
+    p.style.top = cy + '%';
+    p.style.animationDuration = (1.3 + Math.random() * 0.7) + 's';
+    fwLayer.appendChild(p);
+    setTimeout(() => p.remove(), 2200);
+  }
+}
+setInterval(burstFirework, 1800);
+setTimeout(burstFirework, 300);
+setTimeout(burstFirework, 900);
+</script>
+<script>
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x2c0f45, 0.0012);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000);
+camera.position.set(0, 90, 320);
+camera.lookAt(0, 90, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+// ---------- 发光粒子贴图（径向渐变圆点）----------
+function makeGlowTexture(color) {
+  const size = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+  grad.addColorStop(0, color);
+  grad.addColorStop(0.3, color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+
+const texWarm = makeGlowTexture('rgba(235,190,255,1)');
+const texPink = makeGlowTexture('rgba(200,90,255,1)');
+const texGold = makeGlowTexture('rgba(255,245,255,1)');
+
+function makeSparkleTexture() {
+  const size = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const cx = size / 2, cy = size / 2;
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size/2);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.15, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx, 4); ctx.lineTo(cx, size - 4);
+  ctx.moveTo(4, cy); ctx.lineTo(size - 4, cy);
+  ctx.stroke();
+  return new THREE.CanvasTexture(c);
+}
+const texSparkle = makeSparkleTexture();
+
+// ---------- 圣诞树粒子（锥形螺旋分布）----------
+const TREE_HEIGHT = 170;
+const BASE_RADIUS = 60;
+const PARTICLE_COUNT = 9000;
+
+const treeGeo = new THREE.BufferGeometry();
+const positions = new Float32Array(PARTICLE_COUNT * 3);
+const basePositions = new Float32Array(PARTICLE_COUNT * 3); // 用于呼吸/闪烁扰动
+const sizes = new Float32Array(PARTICLE_COUNT);
+const colorMix = new Float32Array(PARTICLE_COUNT); // 0~1 控制颜色
+
+for (let i = 0; i < PARTICLE_COUNT; i++) {
+  const t = Math.pow(Math.random(), 0.65);        // 0 底部, 1 顶部，偏向底部堆积更密
+  const y = t * TREE_HEIGHT;
+  const radiusAtY = BASE_RADIUS * (1 - t) * (0.85 + Math.random() * 0.3);
+  const angle = Math.random() * Math.PI * 2 + y * 0.12; // 螺旋感
+  const jitter = (Math.random() - 0.5) * 6;
+
+  const x = Math.cos(angle) * (radiusAtY + jitter);
+  const z = Math.sin(angle) * (radiusAtY + jitter);
+
+  positions[i*3] = x;
+  positions[i*3+1] = y;
+  positions[i*3+2] = z;
+  basePositions[i*3] = x;
+  basePositions[i*3+1] = y;
+  basePositions[i*3+2] = z;
+
+  sizes[i] = 1.2 + Math.random() * 2.6;
+  colorMix[i] = Math.random();
+}
+
+treeGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+treeGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+const treeMat = new THREE.PointsMaterial({
+  size: 6,
+  map: texWarm,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  vertexColors: false,
+  sizeAttenuation: true,
+  opacity: 1,
+});
+const treePoints = new THREE.Points(treeGeo, treeMat);
+
+// 第二层：粉/金点缀，叠加在同一结构上，营造多色闪烁
+const sparkleGeo = treeGeo.clone();
+const sparkleMat = new THREE.PointsMaterial({
+  size: 7.5,
+  map: texPink,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  opacity: 0.0,
+});
+const sparklePoints = new THREE.Points(sparkleGeo, sparkleMat);
+
+const goldGeo = treeGeo.clone();
+const goldMat = new THREE.PointsMaterial({
+  size: 11,
+  map: texSparkle,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  opacity: 0.0,
+});
+const goldPoints = new THREE.Points(goldGeo, goldMat);
+
+const treeGroup = new THREE.Group();
+treeGroup.add(treePoints, sparklePoints, goldPoints);
+scene.add(treeGroup);
+
+// ---------- 树顶星光 ----------
+const starLight = new THREE.PointLight(0xe0aaff, 5, 350);
+starLight.position.set(0, TREE_HEIGHT + 10, 0);
+scene.add(starLight);
+
+const starSpriteMat = new THREE.SpriteMaterial({
+  map: texSparkle, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const starMesh = new THREE.Sprite(starSpriteMat);
+starMesh.scale.set(40, 40, 1);
+starMesh.position.set(0, TREE_HEIGHT + 10, 0);
+treeGroup.add(starMesh);
+
+const starGlowMat = new THREE.SpriteMaterial({
+  map: texWarm, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const starGlow = new THREE.Sprite(starGlowMat);
+starGlow.scale.set(60, 60, 1);
+starGlow.position.set(0, TREE_HEIGHT + 10, 0);
+treeGroup.add(starGlow);
+
+// ---------- 地面光环粒子（多层同心圆，模拟雪地上的白色光圈）----------
+const texWhite = makeGlowTexture('rgba(235,210,255,1)');
+const RING_LAYERS = 6;
+const RING_PER_LAYER = 1400;
+const ringGroup = new THREE.Group();
+const ringMeshes = [];
+for (let L = 0; L < RING_LAYERS; L++) {
+  const rBase = BASE_RADIUS * (0.5 + L * 0.5);
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(RING_PER_LAYER * 3);
+  for (let i = 0; i < RING_PER_LAYER; i++) {
+    const r = rBase + (Math.random() - 0.5) * 10;
+    const a = Math.random() * Math.PI * 2;
+    pos[i*3] = Math.cos(a) * r;
+    pos[i*3+1] = (Math.random() - 0.5) * 1.5;
+    pos[i*3+2] = Math.sin(a) * r;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 2.6, map: texWhite, transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending, opacity: 0.5 - L * 0.04,
+  });
+  const pts = new THREE.Points(geo, mat);
+  ringGroup.add(pts);
+  ringMeshes.push(mat);
+}
+scene.add(ringGroup);
+
+// 地面大片白色雾状光晕粒子（铺满地面，密集细小）
+const GROUND_COUNT = 6000;
+const groundGeo = new THREE.BufferGeometry();
+const groundPos = new Float32Array(GROUND_COUNT * 3);
+for (let i = 0; i < GROUND_COUNT; i++) {
+  const r = Math.sqrt(Math.random()) * BASE_RADIUS * 3.2;
+  const a = Math.random() * Math.PI * 2;
+  groundPos[i*3] = Math.cos(a) * r;
+  groundPos[i*3+1] = (Math.random() - 0.5) * 1;
+  groundPos[i*3+2] = Math.sin(a) * r;
+}
+groundGeo.setAttribute('position', new THREE.BufferAttribute(groundPos, 3));
+const groundMat = new THREE.PointsMaterial({
+  size: 1.8, map: texWhite, transparent: true, depthWrite: false,
+  blending: THREE.AdditiveBlending, opacity: 0.35,
+});
+const groundPoints = new THREE.Points(groundGeo, groundMat);
+scene.add(groundPoints);
+
+// ---------- 飘雪 ----------
+const SNOW_COUNT = 1500;
+const snowGeo = new THREE.BufferGeometry();
+const snowPos = new Float32Array(SNOW_COUNT * 3);
+const snowSpeed = new Float32Array(SNOW_COUNT);
+for (let i = 0; i < SNOW_COUNT; i++) {
+  snowPos[i*3] = (Math.random() - 0.5) * 500;
+  snowPos[i*3+1] = Math.random() * 400;
+  snowPos[i*3+2] = (Math.random() - 0.5) * 500;
+  snowSpeed[i] = 0.3 + Math.random() * 0.6;
+}
+snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+const snowMat = new THREE.PointsMaterial({
+  size: 1.6, color: 0xffffff, transparent: true, opacity: 0.8, depthWrite: false,
+});
+const snowPoints = new THREE.Points(snowGeo, snowMat);
+scene.add(snowPoints);
+
+// ---------- 动画循环 ----------
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // 整树缓慢旋转
+  treeGroup.rotation.y = t * 0.35;
+  ringGroup.rotation.y = -t * 0.15;
+  ringMeshes.forEach((m, i) => {
+    m.opacity = (0.5 - i * 0.04) + Math.sin(t * 1.5 + i) * 0.08;
+  });
+
+  // 闪烁：粉/金层透明度随时间波动，制造彩灯闪烁感
+  sparkleMat.opacity = 0.65 + Math.sin(t * 2.3) * 0.3;
+  goldMat.opacity = 0.4 + Math.sin(t * 1.7 + 1.5) * 0.3;
+  treeMat.size = 5.5 + Math.sin(t * 3) * 1;
+
+  // 树顶星光呼吸
+  starLight.intensity = 4 + Math.sin(t * 2) * 2;
+  const starPulse = 1 + Math.sin(t * 2.4) * 0.25;
+  starMesh.scale.set(40 * starPulse, 40 * starPulse, 1);
+  starGlow.scale.set(60 * (1 + Math.sin(t * 2.4) * 0.15), 60 * (1 + Math.sin(t * 2.4) * 0.15), 1);
+
+  // 雪花下落
+  const sp = snowPoints.geometry.attributes.position.array;
+  for (let i = 0; i < SNOW_COUNT; i++) {
+    sp[i*3+1] -= snowSpeed[i];
+    if (sp[i*3+1] < -10) sp[i*3+1] = 400;
+  }
+  snowPoints.geometry.attributes.position.needsUpdate = true;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
