@@ -6,10 +6,10 @@
 <title>粒子圣诞树</title>
 <style>
   html, body {
-    margin: 0; height: 100%; overflow: hidden;
+    margin: 0; width: 100%; height: 100%; min-height: 100vh; overflow: hidden;
     background: radial-gradient(ellipse at 50% 40%, #4a1d63 0%, #2c0f45 45%, #180826 80%, #0d0417 100%);
   }
-  canvas { display: block; position: relative; z-index: 2; }
+  canvas { display: block; position: fixed; inset: 0; z-index: 2; }
   .bokeh {
     position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden;
   }
@@ -174,13 +174,20 @@ setTimeout(burstFirework, 900);
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x2c0f45, 0.0012);
 
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000);
+function viewportSize() {
+  return [window.innerWidth || document.documentElement.clientWidth, window.innerHeight || document.documentElement.clientHeight];
+}
+let [vw, vh] = viewportSize();
+
+const camera = new THREE.PerspectiveCamera(50, vw / vh, 0.1, 2000);
 camera.position.set(0, 90, 320);
 camera.lookAt(0, 90, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+
+const renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
+renderer.setSize(vw, vh);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
 document.body.appendChild(renderer.domElement);
 
 // ---------- 发光粒子贴图（径向渐变圆点）----------
@@ -227,7 +234,7 @@ const texSparkle = makeSparkleTexture();
 // ---------- 圣诞树粒子（锥形螺旋分布）----------
 const TREE_HEIGHT = 170;
 const BASE_RADIUS = 60;
-const PARTICLE_COUNT = 9000;
+const PARTICLE_COUNT = isMobile ? 4000 : 9000;
 
 const treeGeo = new THREE.BufferGeometry();
 const positions = new Float32Array(PARTICLE_COUNT * 3);
@@ -260,21 +267,21 @@ treeGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 treeGeo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
 const treeMat = new THREE.PointsMaterial({
-  size: 6,
+  size: 3.2,
   map: texWarm,
   transparent: true,
   depthWrite: false,
   blending: THREE.AdditiveBlending,
   vertexColors: false,
   sizeAttenuation: true,
-  opacity: 1,
+  opacity: 0.75,
 });
 const treePoints = new THREE.Points(treeGeo, treeMat);
 
 // 第二层：粉/金点缀，叠加在同一结构上，营造多色闪烁
 const sparkleGeo = treeGeo.clone();
 const sparkleMat = new THREE.PointsMaterial({
-  size: 7.5,
+  size: 4.5,
   map: texPink,
   transparent: true,
   depthWrite: false,
@@ -285,7 +292,7 @@ const sparklePoints = new THREE.Points(sparkleGeo, sparkleMat);
 
 const goldGeo = treeGeo.clone();
 const goldMat = new THREE.PointsMaterial({
-  size: 11,
+  size: 6,
   map: texSparkle,
   transparent: true,
   depthWrite: false,
@@ -299,7 +306,7 @@ treeGroup.add(treePoints, sparklePoints, goldPoints);
 scene.add(treeGroup);
 
 // ---------- 树顶星光 ----------
-const starLight = new THREE.PointLight(0xe0aaff, 5, 350);
+const starLight = new THREE.PointLight(0xe0aaff, 3, 350);
 starLight.position.set(0, TREE_HEIGHT + 10, 0);
 scene.add(starLight);
 
@@ -321,8 +328,8 @@ treeGroup.add(starGlow);
 
 // ---------- 地面光环粒子（多层同心圆，模拟雪地上的白色光圈）----------
 const texWhite = makeGlowTexture('rgba(235,210,255,1)');
-const RING_LAYERS = 6;
-const RING_PER_LAYER = 1400;
+const RING_LAYERS = isMobile ? 4 : 6;
+const RING_PER_LAYER = isMobile ? 700 : 1400;
 const ringGroup = new THREE.Group();
 const ringMeshes = [];
 for (let L = 0; L < RING_LAYERS; L++) {
@@ -348,7 +355,7 @@ for (let L = 0; L < RING_LAYERS; L++) {
 scene.add(ringGroup);
 
 // 地面大片白色雾状光晕粒子（铺满地面，密集细小）
-const GROUND_COUNT = 6000;
+const GROUND_COUNT = isMobile ? 2500 : 6000;
 const groundGeo = new THREE.BufferGeometry();
 const groundPos = new Float32Array(GROUND_COUNT * 3);
 for (let i = 0; i < GROUND_COUNT; i++) {
@@ -367,7 +374,7 @@ const groundPoints = new THREE.Points(groundGeo, groundMat);
 scene.add(groundPoints);
 
 // ---------- 飘雪 ----------
-const SNOW_COUNT = 1500;
+const SNOW_COUNT = isMobile ? 700 : 1500;
 const snowGeo = new THREE.BufferGeometry();
 const snowPos = new Float32Array(SNOW_COUNT * 3);
 const snowSpeed = new Float32Array(SNOW_COUNT);
@@ -398,13 +405,13 @@ function animate() {
     m.opacity = (0.5 - i * 0.04) + Math.sin(t * 1.5 + i) * 0.08;
   });
 
-  // 闪烁：粉/金层透明度随时间波动，制造彩灯闪烁感
-  sparkleMat.opacity = 0.65 + Math.sin(t * 2.3) * 0.3;
-  goldMat.opacity = 0.4 + Math.sin(t * 1.7 + 1.5) * 0.3;
-  treeMat.size = 5.5 + Math.sin(t * 3) * 1;
+  // 闪烁：粉/金层透明度随时间波动，制造彩灯闪烁感（整体更柔和含蓄）
+  sparkleMat.opacity = 0.3 + Math.sin(t * 2.3) * 0.18;
+  goldMat.opacity = 0.2 + Math.sin(t * 1.7 + 1.5) * 0.15;
+  treeMat.size = 3 + Math.sin(t * 3) * 0.5;
 
   // 树顶星光呼吸
-  starLight.intensity = 4 + Math.sin(t * 2) * 2;
+  starLight.intensity = 2.5 + Math.sin(t * 2) * 1.2;
   const starPulse = 1 + Math.sin(t * 2.4) * 0.25;
   starMesh.scale.set(40 * starPulse, 40 * starPulse, 1);
   starGlow.scale.set(60 * (1 + Math.sin(t * 2.4) * 0.15), 60 * (1 + Math.sin(t * 2.4) * 0.15), 1);
@@ -421,11 +428,16 @@ function animate() {
 }
 animate();
 
-window.addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
+function onResize() {
+  const [w, h] = viewportSize();
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
+setTimeout(onResize, 300);
+setTimeout(onResize, 1000);
 </script>
 </body>
 </html>
